@@ -1,0 +1,33 @@
+{
+  "name": "hozmagazin-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hozmagazin: Telegram bot + API (Node.js, Express, Telegraf, Prisma)",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "embedded-postgres": "16.14.0-beta.17",
+    "express": "^4.21.1",
+    "node-cron": "^3.0.3",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

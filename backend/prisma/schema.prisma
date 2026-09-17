@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  DELIVERING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentType {
+  CASH
+  CARD
+}
+
+enum StockMoveType {
+  IN
+  OUT
+  WRITEOFF
+  RETURN
+  ADJUST
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  telegramId String   @unique
+  firstName  String   @default("")
+  lastName   String?
+  username   String?
+  phone      String?
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     Order[]
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  slug      String    @unique
+  emoji     String    @default("📦")
+  sortOrder Int       @default(0)
+  products  Product[]
+}
+
+model Product {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String          @default("")
+  imageUrl    String          @default("")
+  emoji       String          @default("📦")
+  oldPrice    Int?
+  price       Int
+  unit        String          @default("dona")
+  sku         String          @unique
+  stock       Int             @default(0)
+  minStock    Int             @default(5)
+  isActive    Boolean         @default(true)
+  categoryId  Int
+  category    Category        @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  movements   StockMovement[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([categoryId])
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  number      String      @unique
+  userId      Int
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  subtotal    Int
+  deliveryFee Int         @default(0)
+  total       Int
+  phone       String      @default("")
+  address     String      @default("")
+  latitude    Float?
+  longitude   Float?
+  comment     String      @default("")
+  paymentType PaymentType @default(CASH)
+  status      OrderStatus @default(NEW)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  imageUrl  String   @default("")
+  emoji     String   @default("📦")
+  unit      String   @default("dona")
+  price     Int
+  quantity  Int
+  total     Int
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model StockMovement {
+  id        Int           @id @default(autoincrement())
+  productId Int
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      StockMoveType
+  quantity  Int
+  before    Int
+  after     Int
+  note      String        @default("")
+  createdAt DateTime      @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model Story {
+  id        Int     @id @default(autoincrement())
+  title     String
+  subtitle  String  @default("")
+  text      String  @default("")
+  emoji     String  @default("✨")
+  color     String  @default("#2563EB")
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+}
