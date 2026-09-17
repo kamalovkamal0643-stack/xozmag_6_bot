@@ -6,8 +6,9 @@
 # ===== npm paketlari (npm install bilan qayta o'rnatiladi) =====
 node_modules/
 
-# ===== Build natijalari =====
+# ===== Build natijalari va Vercel CLI sozlamalari =====
 dist/
+.vercel/
 *.local
 *.timestamp-*.mjs
 

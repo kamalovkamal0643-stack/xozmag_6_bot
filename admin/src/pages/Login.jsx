@@ -43,7 +43,7 @@ export default function Login() {
             placeholder="Parolni kiriting"
           />
         </label>
-        <p className="muted small">Parol start.bat oynasida ko'rsatilgan</p>
+        <p className="muted small">Parol serverdagi ADMIN_PASSWORD sozlamasida</p>
 
         {error && <div className="form-error">{error}</div>}
 

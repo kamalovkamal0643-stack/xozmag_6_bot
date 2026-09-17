@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { config } from '../config/default.js';
+import { config, isAdminConfigured } from '../config/default.js';
 import { UserModel } from '../models/User.js';
 import { AppError } from '../utils/helpers.js';
 
@@ -50,8 +50,8 @@ const PROXY_HEADERS = ['cf-ray', 'cf-connecting-ip', 'x-forwarded-for', 'x-forwa
 const isDirectLocalRequest = (req) => !PROXY_HEADERS.some((header) => req.get(header));
 
 export function localOnly(req, res, next) {
-  if (isDirectLocalRequest(req)) return next();
-  next(new AppError('Admin panel faqat do\'kon kompyuterida ishlaydi', 403));
+  if (!config.security.adminLocalOnly || isDirectLocalRequest(req)) return next();
+  next(new AppError("Admin panel faqat do'kon kompyuterida ishlaydi", 403));
 }
 
 export async function telegramAuth(req, res, next) {
@@ -78,16 +78,31 @@ export async function telegramAuth(req, res, next) {
   }
 }
 
-export const createAdminToken = () =>
-  crypto.createHmac('sha256', config.admin.secret).update(`admin:${config.admin.password}`).digest('hex');
+const signAdminToken = (expiresAt) =>
+  crypto.createHmac('sha256', config.admin.secret).update(`admin:${config.admin.password}:${expiresAt}`).digest('hex');
+
+export function createAdminToken() {
+  const expiresAt = Math.floor(Date.now() / 1000) + config.admin.tokenTtlHours * 3600;
+  return `${expiresAt}.${signAdminToken(expiresAt)}`;
+}
+
+function verifyAdminToken(token) {
+  const [rawExpiry, signature] = String(token).split('.');
+  const expiresAt = Number(rawExpiry);
+  if (!expiresAt || !signature || expiresAt < Date.now() / 1000) return false;
+  return safeEqual(signature, signAdminToken(expiresAt));
+}
 
 export function checkAdminPassword(password) {
-  return safeEqual(password || '', config.admin.password);
+  return isAdminConfigured() && safeEqual(password || '', config.admin.password);
 }
 
 export function adminAuth(req, res, next) {
+  if (!isAdminConfigured()) {
+    return next(new AppError('Admin panel sozlanmagan: serverda ADMIN_PASSWORD va ADMIN_SECRET kerak', 503));
+  }
   const header = req.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (token && safeEqual(token, createAdminToken())) return next();
+  if (token && verifyAdminToken(token)) return next();
   next(new AppError('Sessiya tugagan. Qaytadan kiring', 401));
 }

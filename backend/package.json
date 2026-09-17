@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "db:migrate": "prisma migrate dev --name init",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
@@ -19,15 +20,15 @@
     "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "embedded-postgres": "16.14.0-beta.17",
     "express": "^4.21.1",
     "node-cron": "^3.0.3",
+    "prisma": "^5.22.0",
     "telegraf": "^4.16.3"
   },
-  "devDependencies": {
-    "prisma": "^5.22.0"
+  "optionalDependencies": {
+    "embedded-postgres": "16.14.0-beta.17"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   }
 }

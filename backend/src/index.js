@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import dotenv from 'dotenv';
@@ -14,28 +15,68 @@ import { startScheduler } from './services/scheduler.service.js';
 import { seedIfEmpty } from '../prisma/seed.js';
 
 const app = express();
+let botActive = false;
 
 app.set('trust proxy', true);
-app.use(cors());
+app.use(cors(config.corsOrigins.length ? { origin: config.corsOrigins } : undefined));
 app.use(express.json({ limit: '1mb' }));
 
+app.get('/', (req, res) => {
+  res.json({ ok: true, service: 'hozmagazin-api', health: '/api/health' });
+});
+
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, shop: config.shop.name, bot: Boolean(bot), time: new Date().toISOString() });
+  res.json({ ok: true, shop: config.shop.name, bot: botActive, time: new Date().toISOString() });
 });
 
 app.use('/api/client', clientRoutes);
 app.use('/api/admin', adminRoutes);
-app.use(notFound);
-app.use(errorHandler);
 
-async function startBot() {
+function mountWebhook() {
+  if (!bot || !config.bot.webhookDomain) return null;
+  const secret = crypto.createHash('sha256').update(`webhook:${config.bot.token}`).digest('hex');
+  const hookPath = `/telegram/webhook/${secret.slice(0, 24)}`;
+  const handleWebhook = bot.webhookCallback(hookPath, { secretToken: secret });
+
+  app.post(hookPath, (req, res, next) => {
+    Promise.resolve(handleWebhook(req, res, next)).catch((err) => {
+      console.error('❌ Telegram webhook xatosi:', err.description || err.message);
+      if (!res.headersSent) res.sendStatus(200);
+    });
+  });
+
+  return { url: `${config.bot.webhookDomain}${hookPath}`, secret };
+}
+
+async function startBot(webhook) {
   if (!bot) return;
-  registerBotRoutes(bot);
   try {
     const me = await bot.telegram.getMe();
-    await setupBotMenu(bot);
-    bot.launch().catch((err) => console.error("❌ Bot to'xtab qoldi:", err.message));
-    console.log(`🤖 Bot ishlayapti: https://t.me/${me.username}`);
+    bot.botInfo = me;
+
+    if (webhook) {
+      await setupBotMenu(bot);
+      await bot.telegram.setWebhook(webhook.url, {
+        secret_token: webhook.secret,
+        allowed_updates: ['message', 'callback_query'],
+      });
+      botActive = true;
+      console.log(`🤖 Bot webhook rejimida ishlayapti: https://t.me/${me.username}`);
+    } else {
+      const info = await bot.telegram.getWebhookInfo();
+      if (info.url) {
+        console.warn(`⚠️  Bot hozir boshqa serverda ishlayapti (${new URL(info.url).host}) — lokal bot ishga tushirilmadi.`);
+        return;
+      }
+      await setupBotMenu(bot);
+      bot.launch().catch((err) => {
+        botActive = false;
+        console.error("❌ Bot to'xtab qoldi:", err.message);
+      });
+      botActive = true;
+      console.log(`🤖 Bot ishlayapti: https://t.me/${me.username}`);
+    }
+
     startScheduler();
   } catch (err) {
     console.error('❌ Bot ishga tushmadi (BOT_TOKEN ni tekshiring):', err.description || err.message);
@@ -53,7 +94,7 @@ function watchEnvFile() {
       const adminsChanged = reloadAdminIds(parsed.ADMIN_IDS);
       if (urlChanged) console.log(`🔗 Mini App manzili yangilandi: ${config.bot.miniAppUrl}`);
       if (adminsChanged) console.log(`👑 Adminlar yangilandi: ${config.bot.adminIds.join(', ') || '—'}`);
-      if (bot && (urlChanged || adminsChanged)) await setupBotMenu(bot);
+      if (bot && botActive && (urlChanged || adminsChanged)) await setupBotMenu(bot);
     } catch (err) {
       console.warn("⚠️  .env faylini qayta o'qib bo'lmadi:", err.message);
     }
@@ -70,22 +111,27 @@ async function main() {
     await seedIfEmpty(prisma);
   } catch (err) {
     console.error("\n❌ Ma'lumotlar bazasiga ulanib bo'lmadi:", err.message);
-    console.error('   1) backend/.env dagi DATABASE_URL va DIRECT_URL ni tekshiring');
-    console.error('   2) "npx prisma migrate dev --name init" buyrug\'ini bajarganingizga ishonch hosil qiling\n');
+    console.error('   DATABASE_URL va DIRECT_URL ni tekshiring, keyin "npx prisma migrate deploy" ni bajaring\n');
     process.exit(1);
   }
 
-  const server = app.listen(config.port, '127.0.0.1', () => {
-    console.log(`🚀 API ishlayapti: http://localhost:${config.port}/api/health`);
+  if (bot) registerBotRoutes(bot);
+  const webhook = mountWebhook();
+
+  app.use(notFound);
+  app.use(errorHandler);
+
+  const server = app.listen(config.port, config.host, () => {
+    console.log(`🚀 API ishlayapti: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/api/health`);
   });
 
-  await startBot();
+  await startBot(webhook);
   watchEnvFile();
 
   const shutdown = async (signal) => {
     console.log(`\n👋 ${signal} — server to'xtatilmoqda...`);
     try {
-      bot?.stop(signal);
+      if (botActive && !webhook) bot.stop(signal);
     } catch {
       /* bot ishlamayotgan bo'lishi mumkin */
     }

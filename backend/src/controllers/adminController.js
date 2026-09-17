@@ -1,3 +1,4 @@
+import { isAdminConfigured } from '../config/default.js';
 import { ProductModel } from '../models/Product.js';
 import { OrderModel } from '../models/Order.js';
 import { CategoryModel } from '../models/Category.js';
@@ -74,6 +75,9 @@ const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 export const adminController = {
   async login(req, res) {
+    if (!isAdminConfigured()) {
+      throw new AppError('Admin panel sozlanmagan: serverda ADMIN_PASSWORD va ADMIN_SECRET kerak', 503);
+    }
     const ip = req.ip || 'local';
     guardLogin(ip);
     if (!checkAdminPassword(String(req.body?.password || ''))) {

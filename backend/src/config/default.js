@@ -16,23 +16,32 @@ const list = (value) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+const trimUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
+
+export const isCloud = Boolean(process.env.RENDER);
+
 export const config = {
   port: num(process.env.PORT, 5000),
+  host: process.env.HOST || (isCloud ? '0.0.0.0' : '127.0.0.1'),
+  corsOrigins: list(process.env.CORS_ORIGINS).map(trimUrl),
 
   bot: {
     token: (process.env.BOT_TOKEN || '').trim(),
     adminIds: list(process.env.ADMIN_IDS),
-    miniAppUrl: (process.env.MINIAPP_URL || '').trim().replace(/\/+$/, ''),
+    miniAppUrl: trimUrl(process.env.MINIAPP_URL),
+    webhookDomain: trimUrl(process.env.WEBHOOK_URL || process.env.RENDER_EXTERNAL_URL),
   },
 
   admin: {
-    panelUrl: (process.env.ADMIN_PANEL_URL || 'http://localhost:5174').trim(),
-    password: process.env.ADMIN_PASSWORD || 'admin123',
-    secret: process.env.ADMIN_SECRET || 'hozmagazin-secret',
+    panelUrl: trimUrl(process.env.ADMIN_PANEL_URL || 'http://localhost:5174'),
+    password: process.env.ADMIN_PASSWORD || (isCloud ? '' : 'admin123'),
+    secret: process.env.ADMIN_SECRET || (isCloud ? '' : 'hozmagazin-secret'),
+    tokenTtlHours: num(process.env.ADMIN_TOKEN_TTL_HOURS, 168),
   },
 
   security: {
     skipTelegramAuth: bool(process.env.SKIP_TELEGRAM_AUTH, false),
+    adminLocalOnly: bool(process.env.ADMIN_LOCAL_ONLY, !isCloud),
   },
 
   shop: {
@@ -58,15 +67,18 @@ export const hasBotToken = () => /^\d+:[\w-]{30,}$/.test(config.bot.token);
 
 export const hasHttpsMiniApp = () => config.bot.miniAppUrl.startsWith('https://');
 
+export const isAdminConfigured = () => Boolean(config.admin.password && config.admin.secret);
+
 export function getConfigWarnings() {
   const warnings = [];
   if (!String(process.env.DATABASE_URL || '').startsWith('postgres')) {
-    warnings.push('DATABASE_URL to\'ldirilmagan (Neon connection string kerak).');
+    warnings.push("DATABASE_URL to'ldirilmagan (PostgreSQL connection string kerak).");
   }
-  if (!hasBotToken()) warnings.push('BOT_TOKEN noto\'g\'ri yoki bo\'sh — bot ishga tushmaydi.');
-  if (!config.bot.adminIds.length) warnings.push('ADMIN_IDS bo\'sh — /stats va kunlik hisobot hech kimga yuborilmaydi.');
-  if (!hasHttpsMiniApp()) warnings.push("MINIAPP_URL hali yo'q — tunnel ulangach avtomatik yoziladi.");
-  if (config.security.skipTelegramAuth) {
+  if (!hasBotToken()) warnings.push("BOT_TOKEN noto'g'ri yoki bo'sh — bot ishga tushmaydi.");
+  if (!config.bot.adminIds.length) warnings.push("ADMIN_IDS bo'sh — /stats va kunlik hisobot hech kimga yuborilmaydi.");
+  if (!hasHttpsMiniApp()) warnings.push("MINIAPP_URL https manzil emas — botda Do'kon tugmasi chiqmaydi.");
+  if (!isAdminConfigured()) warnings.push("ADMIN_PASSWORD yoki ADMIN_SECRET yo'q — admin panelga kirib bo'lmaydi.");
+  if (config.security.skipTelegramAuth && !isCloud) {
     warnings.push("SKIP_TELEGRAM_AUTH=true — Mini App'ni localhost brauzerida Telegram'siz sinash mumkin (tunnel orqali emas).");
   }
   return warnings;
@@ -80,7 +92,7 @@ export function reloadAdminIds(rawValue) {
 }
 
 export function reloadMiniAppUrl(rawValue) {
-  const url = String(rawValue || '').trim().replace(/\/+$/, '');
+  const url = trimUrl(rawValue);
   if (!url || url === config.bot.miniAppUrl) return false;
   config.bot.miniAppUrl = url;
   return true;

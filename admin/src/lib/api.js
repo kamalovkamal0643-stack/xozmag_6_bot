@@ -29,16 +29,18 @@ const query = (params = {}) => {
   return clean.length ? `?${new URLSearchParams(clean)}` : '';
 };
 
+const API_BASE = `${(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')}/api/admin`;
+
 async function send(path, { method = 'GET', body } = {}) {
   let response;
   try {
-    response = await fetch(`/api/admin${path}`, {
+    response = await fetch(`${API_BASE}${path}`, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.get()}` },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error("Serverga ulanib bo'lmadi. Backend ishlayaptimi?");
+    throw new Error("Serverga ulanib bo'lmadi. Backend ishlayaptimi? (Render'da birinchi so'rov 1 daqiqagacha cho'zilishi mumkin)");
   }
 
   if (response.status === 401 && path !== '/login') {
