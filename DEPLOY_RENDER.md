@@ -24,13 +24,11 @@ Render нужна облачная PostgreSQL. Neon бесплатный и не
 
 1. Откройте https://neon.tech → **Sign up** → войдите через GitHub.
 2. **Create project**: имя `hozmagazin`, регион **AWS Europe Central 1 (Frankfurt)** → **Create**.
-3. На странице проекта нажмите **Connect**.
-4. Выключите переключатель **Connection pooling** и скопируйте строку подключения.
-5. Если в конце строки есть `&channel_binding=require` — удалите этот кусок. В конец допишите `&connect_timeout=15`.
+3. На странице проекта нажмите **Connect** и скопируйте строку подключения кнопкой копирования.
 
-Должно получиться так:
+**Ничего в строке менять не нужно.** Переключатель *Connection pooling*, `channel_binding=require` и таймаут backend настраивает сам. Строка выглядит примерно так:
 ```
-postgresql://neondb_owner:ПАРОЛЬ@ep-xxxx.eu-central-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=15
+postgresql://neondb_owner:ПАРОЛЬ@ep-xxxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 ## Шаг 2. Web Service на Render (5 минут)
@@ -48,7 +46,7 @@ postgresql://neondb_owner:ПАРОЛЬ@ep-xxxx.eu-central-1.aws.neon.tech/neondb
 | **Branch** | `main` |
 | **Region** | `Frankfurt (EU Central)` |
 | **Root Directory** | `backend` |
-| **Build Command** | `npm install --omit=optional && npx prisma migrate deploy` |
+| **Build Command** | `npm install --omit=optional && npm run db:deploy` |
 | **Start Command** | `npm start` |
 | **Instance Type** | `Free` |
 
@@ -57,8 +55,7 @@ postgresql://neondb_owner:ПАРОЛЬ@ep-xxxx.eu-central-1.aws.neon.tech/neondb
 В блоке **Environment Variables** нажмите **Add from .env**, вставьте текст ниже, замените значения в угловых скобках и нажмите **Add variables**:
 
 ```
-DATABASE_URL=<строка из Neon>
-DIRECT_URL=<та же строка из Neon>
+DATABASE_URL=<строка из Neon, как скопировали>
 BOT_TOKEN=<токен бота>
 ADMIN_IDS=<ваш Telegram ID — узнать: отправьте боту /id>
 MINIAPP_URL=https://xozmag-6-miniapp.vercel.app

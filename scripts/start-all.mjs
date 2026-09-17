@@ -116,14 +116,32 @@ async function ensureDependencies() {
 
 async function ensureDatabase(env) {
   const { isLocalDatabaseUrl, startLocalDb } = await import(pathToFileURL(path.join(BACKEND, 'scripts', 'local-db.js')).href);
-  if (isLocalDatabaseUrl(env.DATABASE_URL)) {
+  const isLocal = isLocalDatabaseUrl(env.DATABASE_URL);
+
+  if (isLocal) {
     const { status, created } = await startLocalDb();
     if (created) log('baza', 'yangi lokal PostgreSQL yaratildi');
     log('baza', status === 'running' ? 'lokal PostgreSQL allaqachon ishlayapti' : 'lokal PostgreSQL ishga tushdi (port 5433)');
+
+    let restarting = false;
+    setInterval(async () => {
+      if (shuttingDown || restarting || (await isPortOpen(5433))) return;
+      restarting = true;
+      log('baza', paint(33, "lokal PostgreSQL to'xtab qolgan — qayta yoqilmoqda..."));
+      try {
+        await startLocalDb();
+        log('baza', 'lokal PostgreSQL qayta ishga tushdi ✓');
+      } catch (err) {
+        log('baza', paint(31, err.message));
+      } finally {
+        restarting = false;
+      }
+    }, 30000);
   } else {
     log('baza', 'tashqi PostgreSQL ishlatiladi (DATABASE_URL)');
   }
-  runSync('baza', [path.join(BACKEND, 'node_modules', 'prisma', 'build', 'index.js'), 'migrate', 'deploy'], BACKEND);
+
+  runSync('baza', [path.join(BACKEND, 'scripts', 'migrate-deploy.js')], BACKEND);
 }
 
 async function botUsername(token) {
