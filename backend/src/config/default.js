@@ -54,6 +54,13 @@ export const config = {
     minOrder: num(process.env.MIN_ORDER, 20000),
   },
 
+  keepAlive: {
+    url: trimUrl(process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL),
+    minutes: num(process.env.KEEP_ALIVE_MINUTES, isCloud ? 5 : 0),
+  },
+
+  release: String(process.env.RENDER_GIT_COMMIT || '').slice(0, 7),
+
   reports: {
     cron: process.env.DAILY_REPORT_CRON || '0 20 * * *',
     timezone: process.env.TZ_NAME || 'Asia/Tashkent',

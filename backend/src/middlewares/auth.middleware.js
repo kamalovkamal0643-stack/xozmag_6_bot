@@ -54,6 +54,20 @@ export function localOnly(req, res, next) {
   next(new AppError("Admin panel faqat do'kon kompyuterida ishlaydi", 403));
 }
 
+const USER_CACHE_TTL_MS = 10 * 60 * 1000;
+const userIdCache = new Map();
+
+async function resolveUserId(tgUser) {
+  const key = String(tgUser.id);
+  const cached = userIdCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.id;
+
+  const user = (await UserModel.findByTelegramId(key)) || (await UserModel.upsertFromTelegram(tgUser));
+  if (userIdCache.size > 5000) userIdCache.clear();
+  userIdCache.set(key, { id: user.id, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+  return user.id;
+}
+
 export async function telegramAuth(req, res, next) {
   try {
     const initData = req.get('x-telegram-init-data') || '';
@@ -71,7 +85,7 @@ export async function telegramAuth(req, res, next) {
     if (!tgUser) throw new AppError('Ilovani Telegram bot orqali oching', 401);
 
     req.tgUser = tgUser;
-    req.user = (await UserModel.findByTelegramId(tgUser.id)) || (await UserModel.upsertFromTelegram(tgUser));
+    req.user = { id: await resolveUserId(tgUser) };
     next();
   } catch (err) {
     next(err);

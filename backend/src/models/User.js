@@ -1,12 +1,13 @@
 import { prisma } from '../database/connection.js';
 
 export const UserModel = {
-  upsertFromTelegram(tgUser) {
+  upsertFromTelegram(tgUser, extra = {}) {
     const telegramId = String(tgUser.id);
     const data = {
       firstName: tgUser.first_name || '',
       lastName: tgUser.last_name || null,
       username: tgUser.username || null,
+      ...extra,
     };
     return prisma.user.upsert({
       where: { telegramId },
@@ -24,10 +25,6 @@ export const UserModel = {
     if (phone) data.phone = phone;
     if (address) data.address = address;
     return prisma.user.update({ where: { id: userId }, data });
-  },
-
-  async setPhoneByTelegramId(telegramId, phone) {
-    return prisma.user.updateMany({ where: { telegramId: String(telegramId) }, data: { phone } });
   },
 
   async profileStats(userId) {

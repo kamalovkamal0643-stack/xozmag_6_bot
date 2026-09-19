@@ -126,6 +126,15 @@ export const OrderModel = {
     });
   },
 
+  listForTelegramUser(telegramId, take = 5) {
+    return prisma.order.findMany({
+      where: { user: { telegramId: String(telegramId) } },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+  },
+
   async listForAdmin({ status, q, period, page = 1, pageSize = 20 } = {}) {
     const where = {};
     if (status) where.status = status;

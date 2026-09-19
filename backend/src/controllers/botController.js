@@ -39,7 +39,7 @@ export const botController = {
   BTN,
 
   async start(ctx) {
-    await UserModel.upsertFromTelegram(ctx.from);
+    UserModel.upsertFromTelegram(ctx.from).catch((err) => console.warn("⚠️  Foydalanuvchini saqlab bo'lmadi:", err.message));
     const name = escapeHtml(ctx.from.first_name || 'mehmon');
 
     await ctx.reply(
@@ -56,21 +56,17 @@ export const botController = {
       { ...html, reply_markup: mainKeyboard(ctx.from.id) }
     );
 
+    const adminNote = isAdmin(ctx.from.id)
+      ? "\n\n🛠 <b>Admin:</b> /stats — savdo · /ombor — qoldiq · /buyurtmalar — faol buyurtmalar · /admin — panel"
+      : '';
+
     if (hasHttpsMiniApp()) {
-      await ctx.reply("👇 Katalogni ochish va buyurtma berish uchun tugmani bosing:", {
+      await ctx.reply(`👇 Katalogni ochish va buyurtma berish uchun tugmani bosing:${adminNote}`, {
+        ...html,
         reply_markup: shopInlineButton(),
       });
     } else {
-      await ctx.reply(
-        "⚙️ Do'kon ilovasi hali ulanmagan. Admin .env faylida MINIAPP_URL (ngrok https manzili) ni yozishi kerak."
-      );
-    }
-
-    if (isAdmin(ctx.from.id)) {
-      await ctx.reply(
-        '🛠 <b>Admin rejimi yoqilgan.</b>\n/stats — bugungi savdo\n/ombor — ombor qoldig\'i\n/buyurtmalar — faol buyurtmalar\n/admin — admin panel manzili',
-        html
-      );
+      await ctx.reply(`⚙️ Do'kon ilovasi hali ulanmagan: serverda MINIAPP_URL sozlanmagan.${adminNote}`, html);
     }
   },
 
@@ -107,9 +103,8 @@ export const botController = {
     if (contact.user_id && contact.user_id !== ctx.from.id) {
       return ctx.reply("Iltimos, o'zingizning raqamingizni yuboring 🙂");
     }
-    await UserModel.upsertFromTelegram(ctx.from);
     const phone = contact.phone_number.startsWith('+') ? contact.phone_number : `+${contact.phone_number}`;
-    await UserModel.setPhoneByTelegramId(ctx.from.id, phone);
+    await UserModel.upsertFromTelegram(ctx.from, { phone });
     await ctx.reply(`✅ Raqamingiz saqlandi: <b>${escapeHtml(phone)}</b>\nEndi buyurtma berishda uni qayta yozish shart emas.`, {
       ...html,
       reply_markup: mainKeyboard(ctx.from.id),
@@ -117,8 +112,7 @@ export const botController = {
   },
 
   async myOrders(ctx) {
-    const user = await UserModel.findByTelegramId(ctx.from.id);
-    const orders = user ? (await OrderModel.listForUser(user.id)).slice(0, 5) : [];
+    const orders = await OrderModel.listForTelegramUser(ctx.from.id, 5);
     if (!orders.length) {
       return ctx.reply("Sizda hali buyurtmalar yo'q. Birinchi xaridni hoziroq qiling! 🛒", {
         reply_markup: shopInlineButton(),

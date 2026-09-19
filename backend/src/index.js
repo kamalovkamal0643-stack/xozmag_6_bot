@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin.routes.js';
 import { registerBotRoutes, setupBotMenu } from './routes/bot.routes.js';
 import { notFound, errorHandler } from './middlewares/error.middleware.js';
 import { startScheduler } from './services/scheduler.service.js';
+import { startKeepAlive } from './services/keepalive.service.js';
 import { seedIfEmpty } from '../prisma/seed.js';
 
 const app = express();
@@ -26,7 +27,15 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, shop: config.shop.name, bot: botActive, time: new Date().toISOString() });
+  res.json({
+    ok: true,
+    shop: config.shop.name,
+    bot: botActive,
+    release: config.release || undefined,
+    keepAliveMinutes: config.keepAlive.url ? config.keepAlive.minutes : 0,
+    uptimeSeconds: Math.round(process.uptime()),
+    time: new Date().toISOString(),
+  });
 });
 
 app.use('/api/client', clientRoutes);
@@ -126,6 +135,7 @@ async function main() {
   });
 
   await startBot(webhook);
+  startKeepAlive();
   watchEnvFile();
 
   const shutdown = async (signal) => {
